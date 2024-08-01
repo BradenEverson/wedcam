@@ -1,24 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WebSocket Image Stream</title>
     <style>
-        body, html {
+        body,
+        html {
             margin: 0;
             padding: 0;
             overflow: hidden;
             width: 100%;
             height: 100%;
-            display: flex;
-            flex-direction: column;
         }
+
         canvas {
             display: block;
             width: 100%;
-            height: calc(100% - 120px); /* Adjust canvas height to accommodate buttons */
+            height: 100%;
         }
+
         #captureButton {
             width: 60px;
             height: 60px;
@@ -35,7 +37,9 @@
             bottom: 40px;
             left: 50%;
             transform: translateX(-50%);
+            z-index: 10;
         }
+
         #closeButton {
             width: 40px;
             height: 40px;
@@ -51,7 +55,9 @@
             position: absolute;
             top: 20px;
             left: 20px;
+            z-index: 10;
         }
+
         #countdown {
             position: absolute;
             top: 50%;
@@ -60,14 +66,30 @@
             font-size: 48px;
             color: white;
             text-shadow: 2px 2px 4px #000;
+            z-index: 10;
+        }
+
+        #flash {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: white;
+            z-index: 9;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.2s ease-in-out;
         }
     </style>
 </head>
+
 <body>
     <canvas id="imageCanvas"></canvas>
     <button id="captureButton">📸</button>
     <button id="closeButton">X</button>
     <div id="countdown"></div>
+    <div id="flash"></div>
 
     <script>
         const canvas = document.getElementById('imageCanvas');
@@ -75,17 +97,18 @@
         const captureButton = document.getElementById('captureButton');
         const closeButton = document.getElementById('closeButton');
         const countdownDiv = document.getElementById('countdown');
+        const flashDiv = document.getElementById('flash');
         let countdownInterval;
 
         function resizeCanvas() {
             canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight - 120; // Adjust for buttons height
+            canvas.height = window.innerHeight;
         }
 
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas(); // Initial canvas resize
 
-        const ws = new WebSocket('/');
+        const ws = new WebSocket('ws://127.0.0.1:7878');
         ws.binaryType = 'arraybuffer';
 
         ws.onopen = () => {
@@ -123,7 +146,8 @@
                 if (countdown === 0) {
                     clearInterval(countdownInterval);
                     countdownDiv.style.display = 'none';
-                    captureImage();
+                    triggerFlash();
+                    setTimeout(captureImage, 200); // Delay capture to sync with flash
                 } else {
                     countdownDiv.textContent = countdown;
                 }
@@ -135,6 +159,17 @@
             window.close();
         });
 
+        function triggerFlash() {
+            flashDiv.style.display = 'block';
+            flashDiv.style.opacity = '1';
+            setTimeout(() => {
+                flashDiv.style.opacity = '0';
+                setTimeout(() => {
+                    flashDiv.style.display = 'none';
+                }, 200);
+            }, 100);
+        }
+
         function captureImage() {
             canvas.toBlob((blob) => {
                 const formData = new FormData();
@@ -144,15 +179,16 @@
                     method: 'POST',
                     body: formData
                 })
-                .then(response => response.json())
-                .then(data => {
-                    console.log('Image uploaded successfully:', data);
-                })
-                .catch(error => {
-                    console.error('Error uploading image:', error);
-                });
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log('Image uploaded successfully:', data);
+                    })
+                    .catch(error => {
+                        console.error('Error uploading image:', error);
+                    });
             }, 'image/jpeg');
         }
     </script>
 </body>
+
 </html>
