@@ -14,9 +14,10 @@ use wedcam::session::Session;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize Server and Sockets
     let state = Session::default();
+    let state_clone = state.clone();
     let listener = TcpListener::bind("0.0.0.0:7878").await.expect("Error binding to port");
 
-    let connection_handler = async {
+    let connection_handler = async move {
         loop {
             let (socket, _) = listener.accept().await.expect("Error accepting incoming connection");
             let state_here = state.clone();
@@ -36,12 +37,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    let camera_handler = async {
-        let state_here = state.clone();
+    let camera_handler = async move {
+        let state_here = state_clone.clone();
         let dev = Device::new(0)?;
 
-        let fmt = dev.format()?;
-        println!("Active format:\n{}", fmt);
+        dev.format()?;
 
         let fmt = Format::new(640, 480, FourCC::new(b"MJPG"));
         dev.set_format(&fmt).expect("Format set error");
@@ -49,7 +49,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut stream = Stream::with_buffers(&dev, Type::VideoCapture, 4)?;
 
         while let Ok((buf, _)) = stream.next() {
-            println!("Captured frame of size: {}", buf.len());
             if let Err(e) = state_here.broadcast_img(&buf).await {
                 eprintln!("Error broadcasting image: {}", e);
             }
@@ -58,10 +57,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok::<(), Box<dyn std::error::Error>>(())
     };
 
-    tokio::select! {
-        _ = camera_handler => {},
+    /*tokio::select! {
         _ = connection_handler => {},
-    }
+        _ = camera_handler => {},
+    }*/
 
-    Ok(())
+    tokio::spawn(async move {
+        camera_handler.await.unwrap();
+    });
+
+    connection_handler.await
 }
