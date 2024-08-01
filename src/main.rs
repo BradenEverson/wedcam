@@ -49,7 +49,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         while let Ok((buf, _)) = stream.next() {
             println!("Captured frame of size: {}", buf.len());
-            state_here.broadcast_img(&buf).await.expect("Error broadcasting image");
+            if let Err(e) = state_here.broadcast_img(&buf).await {
+                eprintln!("Error broadcasting image: {}", e);
+            }
         }
 
         Ok::<(), Box<dyn std::error::Error>>(())
