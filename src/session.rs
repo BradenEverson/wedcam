@@ -12,15 +12,17 @@ use uuid::Uuid;
 #[derive(Default, Clone)]
 pub struct Session {
     pub state: Arc<RwLock<State>>,
-    pub connections: Arc<Mutex<WebsocketConnections>>
+    pub connections: Arc<Mutex<WebsocketConnections>>,
 }
 
 impl Session {
-    pub async fn broadcast_img(&mut self, img: &[u8]) -> Result<(), ConnectionError>  {
+    pub async fn broadcast_img(&self, img: &[u8]) -> Result<(), ConnectionError> {
         let mut connections = self.connections.lock().await;
 
         for socket in &mut connections.connections {
-            socket.send(Message::binary(img)).await?;
+            if let Err(e) = socket.send(Message::binary(img)).await {
+                eprintln!("Error sending image: {}", e);
+            }
         }
 
         Ok(())
@@ -29,7 +31,7 @@ impl Session {
 
 #[derive(Default)]
 pub struct WebsocketConnections {
-    connections: Vec<WebSocketStream<TokioIo<Upgraded>>>
+    connections: Vec<WebSocketStream<TokioIo<Upgraded>>>,
 }
 
 #[derive(Default)]
@@ -47,7 +49,6 @@ impl State {
 
         new_id
     }
-
 }
 
 impl Service<Request<body::Incoming>> for Session {
@@ -57,13 +58,14 @@ impl Service<Request<body::Incoming>> for Session {
 
     fn call(&self, mut req: Request<body::Incoming>) -> Self::Future {
         if hyper_tungstenite::is_upgrade_request(&req) {
-            // Websocket Connection
-            let (response, websocket) = hyper_tungstenite::upgrade(&mut req, None).expect("Websocket upgrade failed");
+            // WebSocket Connection
+            let (response, websocket) = hyper_tungstenite::upgrade(&mut req, None).expect("WebSocket upgrade failed");
 
             let conn = self.connections.clone();
             tokio::spawn(async move {
-                let websocket = websocket.await.expect("Get stream");
-                conn.clone().lock().await.connections.push(websocket);
+                if let Ok(websocket) = websocket.await {
+                    conn.lock().await.connections.push(websocket);
+                }
             });
 
             return Box::pin(async { Ok(response) });

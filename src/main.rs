@@ -12,7 +12,6 @@ use wedcam::session::Session;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-
     // Initialize Server and Sockets
     let state = Session::default();
     let listener = TcpListener::bind("0.0.0.0:7878").await.expect("Error binding to port");
@@ -20,21 +19,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let connection_handler = async {
         loop {
             let (socket, _) = listener.accept().await.expect("Error accepting incoming connection");
-            let mut state_here = state.clone();
+            let state_here = state.clone();
 
             let io = TokioIo::new(socket);
 
             tokio::spawn(async move {
-                let _ = http1::Builder::new()
-                    .serve_connection(io, &mut state_here)
+                if let Err(e) = http1::Builder::new()
+                    .serve_connection(io, state_here)
                     .with_upgrades()
-                    .await;
-           });
+                    .await
+                {
+                    eprintln!("Error serving connection: {}", e);
+                }
+            });
         }
     };
 
     let camera_handler = async {
-        let mut state_here = state.clone();
+        let state_here = state.clone();
         let dev = Device::new(0)?;
 
         let fmt = dev.format()?;
@@ -46,10 +48,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut stream = Stream::with_buffers(&dev, Type::VideoCapture, 4)?;
 
         while let Ok((buf, _)) = stream.next() {
-            //let mut file = File::create("frame.jpg")?;
-            //file.write_all(&buf)?;
-            state_here.broadcast_img(buf).await.expect("Error broadcasting image");
+            state_here.broadcast_img(&buf).await.expect("Error broadcasting image");
         }
+
         Ok::<(), Box<dyn std::error::Error>>(())
     };
 
