@@ -1,12 +1,5 @@
 use std::{pin::Pin, sync::Arc};
 
-use v4l::buffer::Type;
-use v4l::device::Device;
-use v4l::format::Format;
-use v4l::io::mmap::Stream;
-use v4l::io::traits::CaptureStream;
-use v4l::video::Capture;
-use v4l::FourCC;
 use futures_util::{lock::Mutex, Future, SinkExt};
 use http_body_util::Full;
 use hyper::{body::{self, Bytes}, service::Service, upgrade::Upgraded, Request, Response};
@@ -67,29 +60,10 @@ impl Service<Request<body::Incoming>> for Session {
             // Websocket Connection
             let (response, websocket) = hyper_tungstenite::upgrade(&mut req, None).expect("Websocket upgrade failed");
 
+            let conn = self.connections.clone();
             tokio::spawn(async move {
-                let mut websocket = websocket.await.expect("Get stream");
-
-                let dev = Device::new(0).unwrap();
-
-                let fmt = dev.format().unwrap();
-                println!("Active format:\n{}", fmt);
-
-                let fmt = Format::new(640, 480, FourCC::new(b"MJPG"));
-                dev.set_format(&fmt).expect("Format set error");
-
-                let mut stream = Stream::with_buffers(&dev, Type::VideoCapture, 4).unwrap();
-
-                while let Ok((buf, _)) = stream.next() {
-
-                    websocket.send(Message::binary(buf)).await.unwrap();
-
-                }
-                    //let mut file = File::create("frame.jpg")?;
-                    //file.write_all(&buf)?;
-                    //state_here.broadcast_img(buf).await.expect("Error broadcasting image");
-
-                    //conn.clone().lock().await.connections.push(websocket);
+                let websocket = websocket.await.expect("Get stream");
+                conn.clone().lock().await.connections.push(websocket);
             });
 
             return Box::pin(async { Ok(response) });
