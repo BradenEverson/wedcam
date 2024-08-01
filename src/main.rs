@@ -1,3 +1,6 @@
+use std::os::unix::thread;
+use std::time::Duration;
+
 use hyper::server::conn::http1;
 use hyper_util::rt::TokioIo;
 use tokio::net::TcpListener;
@@ -49,9 +52,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         while let Ok((buf, _)) = stream.next() {
             println!("Captured frame of size: {}", buf.len());
-            if let Err(e) = state_here.broadcast_img(&buf).await {
-                eprintln!("Error broadcasting image: {}", e);
+            {
+                if let Err(e) = state_here.broadcast_img(&buf).await {
+                    eprintln!("Error broadcasting image: {}", e);
+                }
             }
+            std::thread::sleep(Duration::from_millis(10));
         }
 
         Ok::<(), Box<dyn std::error::Error>>(())

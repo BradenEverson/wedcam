@@ -69,6 +69,7 @@ impl Service<Request<body::Incoming>> for Session {
                     Ok(ws) => {
                         println!("WebSocket connection established");
                         conn.lock().await.connections.push(ws);
+                        println!("Number of connections after adding: {}", conn.lock().await.connections.len());
                     }
                     Err(e) => eprintln!("Failed to establish WebSocket connection: {}", e),
                 }
