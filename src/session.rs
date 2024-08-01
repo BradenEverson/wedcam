@@ -1,4 +1,4 @@
-use std::{fs::File, io::Read, pin::Pin, sync::Arc};
+use std::{error::Error, fs::File, io::Read, pin::Pin, sync::Arc};
 
 use futures_util::{lock::Mutex, Future, SinkExt};
 use http_body_util::Full;
@@ -49,6 +49,12 @@ impl State {
 
         new_id
     }
+
+    pub fn end_session(&mut self, email: Option<&str>) -> Result<(), Box<dyn Error>> {
+        self.curr_session = None;
+        // TODO: Email all pictures if email exists
+        Ok(())
+    }
 }
 
 impl Service<Request<body::Incoming>> for Session {
@@ -76,11 +82,22 @@ impl Service<Request<body::Incoming>> for Session {
             let response = Response::builder()
                 .status(StatusCode::OK);
 
+            let state = self.state.clone();
+
             let res = match req.method() {
                 &Method::GET => {
                     let path = match req.uri().path() {
-                        "/camera" => "html/camera.html",
-                        _ => "html/index.html"
+                        "/camera" => {
+                            // Create new session UUID
+                            tokio::spawn(async move {
+                                state.clone().write().await.new_session();
+                            });
+                            "html/camera.html"
+                        },
+                        "/" => {
+                            "html/index.html"
+                        },
+                        _ => "html/404.html"
                     };
                     let mut page = File::open(path).expect("Failed to open test file");
                     let mut buf = vec![];
