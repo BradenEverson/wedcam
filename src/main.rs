@@ -1,6 +1,10 @@
+use std::fs::File;
+use std::io::Write;
+
 use hyper::server::conn::http1;
 use hyper_util::rt::TokioIo;
 use tokio::net::TcpListener;
+use uuid::Uuid;
 use v4l::buffer::Type;
 use v4l::device::Device;
 use v4l::format::Format;
@@ -51,15 +55,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             if let Err(e) = state_here.broadcast_img(&buf).await {
                 eprintln!("Error broadcasting image: {}", e);
             }
+
+            let time = {
+                state_here.connections.lock().await.take_pic() 
+            };
+            
+            if time {
+                let session = state_here.state.read().await.curr_session;
+                if let Some(session) = session {
+                    let file_name = Uuid::new_v4();
+                        let mut file = File::create(format!("sessions/{}/{}.jpg", session, file_name))?;
+                    file.write_all(&buf)?;
+                }
+            }
         }
 
         Ok::<(), Box<dyn std::error::Error>>(())
     };
-
-    /*tokio::select! {
-        _ = connection_handler => {},
-        _ = camera_handler => {},
-    }*/
 
     tokio::spawn(async move {
         camera_handler.await.unwrap();

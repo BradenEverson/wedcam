@@ -32,11 +32,27 @@ impl Session {
 #[derive(Default)]
 pub struct WebsocketConnections {
     connections: Vec<WebSocketStream<TokioIo<Upgraded>>>,
+    take_pic: bool,
+}
+
+impl WebsocketConnections {
+    pub fn take_pic(&mut self) -> bool {
+        if self.take_pic {
+            self.take_pic = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn take_pic_time(&mut self) {
+        self.take_pic = true
+    }
 }
 
 #[derive(Default)]
 pub struct State {
-    curr_session: Option<Uuid>,
+    pub curr_session: Option<Uuid>,
 }
 
 type ConnectionError = Box<dyn std::error::Error + Send + Sync + 'static>;
@@ -83,6 +99,7 @@ impl Service<Request<body::Incoming>> for Session {
                 .status(StatusCode::OK);
 
             let state = self.state.clone();
+            let connections = self.connections.clone();
 
             let res = match req.method() {
                 &Method::GET => {
@@ -109,7 +126,10 @@ impl Service<Request<body::Incoming>> for Session {
                 &Method::POST => {
                     match req.uri().path() {
                         "/pic" => {
-                            todo!("save newest pic to fs and move servo to take polaroid")
+                            tokio::spawn(async move {
+                                let connections = connections.clone();
+                                connections.lock().await.take_pic_time();
+                            });
                         },
                         "/export" => {
                             todo!("Parse json body to get sender email and try sending all pictures in the session to that email")
