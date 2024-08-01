@@ -48,6 +48,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut stream = Stream::with_buffers(&dev, Type::VideoCapture, 4)?;
 
         while let Ok((buf, _)) = stream.next() {
+            println!("Captured frame of size: {}", buf.len());
             state_here.broadcast_img(&buf).await.expect("Error broadcasting image");
         }
 

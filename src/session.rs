@@ -20,7 +20,8 @@ impl Session {
         let mut connections = self.connections.lock().await;
 
         for socket in &mut connections.connections {
-            if let Err(e) = socket.send(Message::binary(img)).await {
+            println!("Sending image to connection");
+            if let Err(e) = socket.send(Message::binary(img.to_vec())).await {
                 eprintln!("Error sending image: {}", e);
             }
         }
@@ -64,7 +65,10 @@ impl Service<Request<body::Incoming>> for Session {
             let conn = self.connections.clone();
             tokio::spawn(async move {
                 if let Ok(websocket) = websocket.await {
+                    println!("WebSocket connection established");
                     conn.lock().await.connections.push(websocket);
+                } else {
+                    eprintln!("Failed to establish WebSocket connection");
                 }
             });
 
