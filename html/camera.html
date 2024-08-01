@@ -205,12 +205,12 @@
                     .then(data => {
                         console.log('Email sent successfully:', data);
                         ws.close();
-                        window.location.href = 'index.html';
+                        window.location.href = '/';
                     })
                     .catch(error => {
                         console.error('Error sending email:', error);
                         ws.close();
-                        window.location.href = 'index.html';
+                        window.location.href = '/';
                     });
             }
         });
