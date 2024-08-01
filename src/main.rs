@@ -1,4 +1,3 @@
-use std::os::unix::thread;
 use std::time::Duration;
 
 use hyper::server::conn::http1;
@@ -51,7 +50,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut stream = Stream::with_buffers(&dev, Type::VideoCapture, 4)?;
 
         while let Ok((buf, _)) = stream.next() {
-            println!("Captured frame of size: {}", buf.len());
             {
                 if let Err(e) = state_here.broadcast_img(&buf).await {
                     eprintln!("Error broadcasting image: {}", e);
