@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use hyper::server::conn::http1;
 use hyper_util::rt::TokioIo;
 use tokio::net::TcpListener;
@@ -26,6 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let io = TokioIo::new(socket);
 
             tokio::spawn(async move {
+                println!("Accepted connection, serving...");
                 if let Err(e) = http1::Builder::new()
                     .serve_connection(io, state_here)
                     .with_upgrades()
@@ -38,7 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let camera_handler = async {
-        //let state_here = state.clone();
+        let state_here = state.clone();
         let dev = Device::new(0)?;
 
         let fmt = dev.format()?;
@@ -50,16 +49,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut stream = Stream::with_buffers(&dev, Type::VideoCapture, 4)?;
 
         while let Ok((buf, _)) = stream.next() {
-            {
-                /*let res = {
-                    //state_here.broadcast_img(&buf).await
-                    Ok(())
-                };
-                if let Err(e) = res {
-                    eprintln!("Error broadcasting image: {}", e);
-                }*/
+            println!("Captured frame of size: {}", buf.len());
+            if let Err(e) = state_here.broadcast_img(&buf).await {
+                eprintln!("Error broadcasting image: {}", e);
             }
-            std::thread::sleep(Duration::from_millis(10));
         }
 
         Ok::<(), Box<dyn std::error::Error>>(())

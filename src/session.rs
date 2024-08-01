@@ -18,8 +18,10 @@ pub struct Session {
 impl Session {
     pub async fn broadcast_img(&self, img: &[u8]) -> Result<(), ConnectionError> {
         let mut connections = self.connections.lock().await;
+        println!("Broadcasting image to {} connections", connections.connections.len());
 
         for (i, socket) in connections.connections.iter_mut().enumerate() {
+            println!("Sending image to connection {}", i);
             if let Err(e) = socket.send(Message::binary(img.to_vec())).await {
                 eprintln!("Error sending image to connection {}: {}", i, e);
             }
@@ -58,17 +60,17 @@ impl Service<Request<body::Incoming>> for Session {
 
     fn call(&self, mut req: Request<body::Incoming>) -> Self::Future {
         if hyper_tungstenite::is_upgrade_request(&req) {
+            println!("WebSocket upgrade requested");
             // WebSocket Connection
             let (response, websocket) = hyper_tungstenite::upgrade(&mut req, None).expect("WebSocket upgrade failed");
 
             let conn = self.connections.clone();
-
             tokio::spawn(async move {
                 match websocket.await {
                     Ok(ws) => {
                         println!("WebSocket connection established");
-                        let conn = conn.clone();
                         conn.lock().await.connections.push(ws);
+                        println!("Number of connections after adding: {}", conn.lock().await.connections.len());
                     }
                     Err(e) => eprintln!("Failed to establish WebSocket connection: {}", e),
                 }
@@ -76,6 +78,7 @@ impl Service<Request<body::Incoming>> for Session {
 
             return Box::pin(async { Ok(response) });
         } else {
+            println!("Received non-WebSocket request");
             // Normal HTTP
             todo!();
         }
