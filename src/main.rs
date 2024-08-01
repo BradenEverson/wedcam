@@ -25,7 +25,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let io = TokioIo::new(socket);
 
             tokio::spawn(async move {
-                println!("Accepted connection, serving...");
                 if let Err(e) = http1::Builder::new()
                     .serve_connection(io, state_here)
                     .with_upgrades()

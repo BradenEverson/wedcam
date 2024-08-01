@@ -32,7 +32,7 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas(); // Initial canvas resize
 
-        const ws = new WebSocket('ws://127.0.0.1:7878');
+        const ws = new WebSocket('/');
         ws.binaryType = 'arraybuffer';
 
         ws.onopen = () => {
