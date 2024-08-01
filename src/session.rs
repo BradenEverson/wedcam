@@ -19,10 +19,17 @@ impl Session {
     pub async fn broadcast_img(&self, img: &[u8]) -> Result<(), ConnectionError> {
         let mut connections = self.connections.lock().await;
 
+        let mut to_remove = vec![];
+
         for (i, socket) in connections.connections.iter_mut().enumerate() {
             if let Err(e) = socket.send(Message::binary(img.to_vec())).await {
                 eprintln!("Error sending image to connection {}: {}", i, e);
+                to_remove.push(i);
             }
+        }
+
+        while let Some(idx) = to_remove.pop() {
+            connections.connections.remove(idx);
         }
 
         Ok(())

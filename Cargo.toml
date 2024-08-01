@@ -9,6 +9,7 @@ http-body-util = "0.1.2"
 hyper = { version = "1.4.1", features = ["full"] }
 hyper-tungstenite = "0.14.0"
 hyper-util = { version = "0.1.6", features = ["full", "tokio"] }
+lettre = "0.11.7"
 tokio = { version = "1.39.2", features = ["full"] }
 tokio-tungstenite = "0.23.1"
 tungstenite = "0.23.0"
