@@ -64,12 +64,13 @@ impl Service<Request<body::Incoming>> for Session {
             let (response, websocket) = hyper_tungstenite::upgrade(&mut req, None).expect("WebSocket upgrade failed");
 
             let conn = self.connections.clone();
+
             tokio::spawn(async move {
                 match websocket.await {
                     Ok(ws) => {
                         println!("WebSocket connection established");
+                        let conn = conn.clone();
                         conn.lock().await.connections.push(ws);
-                        println!("Number of connections after adding: {}", conn.lock().await.connections.len());
                     }
                     Err(e) => eprintln!("Failed to establish WebSocket connection: {}", e),
                 }
