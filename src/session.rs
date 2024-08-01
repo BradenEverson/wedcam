@@ -2,7 +2,7 @@ use std::{fs::File, io::Read, pin::Pin, sync::Arc};
 
 use futures_util::{lock::Mutex, Future, SinkExt};
 use http_body_util::Full;
-use hyper::{body::{self, Bytes}, service::Service, upgrade::Upgraded, Request, Response, StatusCode};
+use hyper::{body::{self, Bytes}, service::Service, upgrade::Upgraded, Method, Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
 use tokio::sync::RwLock;
 use tokio_tungstenite::WebSocketStream;
@@ -76,11 +76,27 @@ impl Service<Request<body::Incoming>> for Session {
             let response = Response::builder()
                 .status(StatusCode::OK);
 
-            let mut page = File::open("html/test.html").expect("Failed to open test file");
-            let mut buf = vec![];
-            page.read_to_end(&mut buf).expect("Failed to read file");
+            let res = match req.method() {
+                &Method::GET => {
+                    let path = match req.uri().path() {
+                        "/camera" => "html/camera.html",
+                        _ => "html/index.html"
+                    };
+                    let mut page = File::open(path).expect("Failed to open test file");
+                    let mut buf = vec![];
+                    page.read_to_end(&mut buf).expect("Failed to read file");
 
-            let res = response.body(Full::new(Bytes::copy_from_slice(&buf)));
+                    response.body(Full::new(Bytes::copy_from_slice(&buf)))
+
+                },
+                &Method::POST => {
+                    todo!()
+                },
+                _ => {
+                    todo!()
+                }
+            };
+
             Box::pin(async { res })
         }
     }

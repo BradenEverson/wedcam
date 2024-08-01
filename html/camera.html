@@ -81,6 +81,29 @@
             opacity: 0;
             transition: opacity 0.2s ease-in-out;
         }
+
+        #popupForm {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 20px;
+            border: 2px solid black;
+            border-radius: 10px;
+            z-index: 11;
+        }
+
+        #popupForm input[type="email"] {
+            display: block;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        #popupForm button {
+            margin-right: 10px;
+        }
     </style>
 </head>
 
@@ -90,6 +113,12 @@
     <button id="closeButton">X</button>
     <div id="countdown"></div>
     <div id="flash"></div>
+    <div id="popupForm">
+        <p>Do you want to save your pictures via email?</p>
+        <input type="email" id="emailInput" placeholder="Enter your email" required>
+        <button id="submitEmail">Submit</button>
+        <button id="cancel">No Thanks!</button>
+    </div>
 
     <script>
         const canvas = document.getElementById('imageCanvas');
@@ -98,6 +127,10 @@
         const closeButton = document.getElementById('closeButton');
         const countdownDiv = document.getElementById('countdown');
         const flashDiv = document.getElementById('flash');
+        const popupForm = document.getElementById('popupForm');
+        const emailInput = document.getElementById('emailInput');
+        const submitEmail = document.getElementById('submitEmail');
+        const cancel = document.getElementById('cancel');
         let countdownInterval;
 
         function resizeCanvas() {
@@ -155,8 +188,36 @@
         });
 
         closeButton.addEventListener('click', () => {
+            popupForm.style.display = 'block';
+        });
+
+        submitEmail.addEventListener('click', () => {
+            const email = emailInput.value;
+            if (email) {
+                fetch('/export', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email: email })
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log('Email sent successfully:', data);
+                        ws.close();
+                        window.location.href = 'index.html';
+                    })
+                    .catch(error => {
+                        console.error('Error sending email:', error);
+                        ws.close();
+                        window.location.href = 'index.html';
+                    });
+            }
+        });
+
+        cancel.addEventListener('click', () => {
             ws.close();
-            window.close();
+            window.location.href = 'index.html';
         });
 
         function triggerFlash() {
