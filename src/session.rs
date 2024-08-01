@@ -1,8 +1,8 @@
-use std::{pin::Pin, sync::Arc};
+use std::{fs::File, io::Read, pin::Pin, sync::Arc};
 
 use futures_util::{lock::Mutex, Future, SinkExt};
 use http_body_util::Full;
-use hyper::{body::{self, Bytes}, service::Service, upgrade::Upgraded, Request, Response};
+use hyper::{body::{self, Bytes}, service::Service, upgrade::Upgraded, Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
 use tokio::sync::RwLock;
 use tokio_tungstenite::WebSocketStream;
@@ -80,7 +80,15 @@ impl Service<Request<body::Incoming>> for Session {
         } else {
             println!("Received non-WebSocket request");
             // Normal HTTP
-            todo!();
+            let response = Response::builder()
+                .status(StatusCode::OK);
+
+            let mut page = File::open("html/test.html").expect("Failed to open test file");
+            let mut buf = vec![];
+            page.read_to_end(&mut buf).expect("Failed to read file");
+
+            let res = response.body(Full::new(Bytes::copy_from_slice(&buf)));
+            Box::pin(async { res })
         }
     }
 }
