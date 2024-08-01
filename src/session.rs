@@ -44,7 +44,7 @@ type ConnectionError = Box<dyn std::error::Error + Send + Sync + 'static>;
 impl State {
     pub fn new_session(&mut self) -> Uuid {
         let new_id = Uuid::new_v4();
-        std::fs::create_dir(new_id.to_string()).expect("Error creating new directory with Uuid");
+        std::fs::create_dir(format!("sessions/{}", new_id)).expect("Error creating new directory with Uuid");
         self.curr_session = Some(new_id);
 
         new_id
@@ -107,10 +107,24 @@ impl Service<Request<body::Incoming>> for Session {
 
                 },
                 &Method::POST => {
-                    todo!()
+                    match req.uri().path() {
+                        "/pic" => {
+                            todo!("save newest pic to fs and move servo to take polaroid")
+                        },
+                        "/export" => {
+                            todo!("Parse json body to get sender email and try sending all pictures in the session to that email")
+                        },
+                        _ => {}
+                    }
+
+                    response.body(Full::new(Bytes::copy_from_slice(&[])))
                 },
                 _ => {
-                    todo!()
+                    let mut page = File::open("html/404.html").expect("Failed to open test file");
+                    let mut buf = vec![];
+                    page.read_to_end(&mut buf).expect("Failed to read file");
+
+                    response.body(Full::new(Bytes::copy_from_slice(&buf)))
                 }
             };
 
