@@ -18,10 +18,8 @@ pub struct Session {
 impl Session {
     pub async fn broadcast_img(&self, img: &[u8]) -> Result<(), ConnectionError> {
         let mut connections = self.connections.lock().await;
-        println!("Broadcasting image to {} connections", connections.connections.len());
 
         for (i, socket) in connections.connections.iter_mut().enumerate() {
-            println!("Sending image to connection {}", i);
             if let Err(e) = socket.send(Message::binary(img.to_vec())).await {
                 eprintln!("Error sending image to connection {}: {}", i, e);
             }

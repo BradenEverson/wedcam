@@ -38,7 +38,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let camera_handler = async {
-        let state_here = state.clone();
+        //let state_here = state.clone();
         let dev = Device::new(0)?;
 
         let fmt = dev.format()?;
@@ -51,9 +51,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         while let Ok((buf, _)) = stream.next() {
             {
-                if let Err(e) = state_here.broadcast_img(&buf).await {
+                /*let res = {
+                    //state_here.broadcast_img(&buf).await
+                    Ok(())
+                };
+                if let Err(e) = res {
                     eprintln!("Error broadcasting image: {}", e);
-                }
+                }*/
             }
             std::thread::sleep(Duration::from_millis(10));
         }
