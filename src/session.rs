@@ -12,37 +12,31 @@ use uuid::Uuid;
 #[derive(Default, Clone)]
 pub struct Session {
     pub state: Arc<RwLock<State>>,
-    pub connections: Arc<Mutex<WebsocketConnections>>,
+    pub connection: Arc<Mutex<WebsocketConnection>>,
 }
 
 impl Session {
     pub async fn broadcast_img(&self, img: &[u8]) -> Result<(), ConnectionError> {
-        let mut connections = self.connections.lock().await;
+        let mut connection = self.connection.lock().await;
 
-        let mut to_remove = vec![];
-
-        for (i, socket) in connections.connections.iter_mut().enumerate() {
-            if let Err(e) = socket.send(Message::binary(img.to_vec())).await {
-                eprintln!("Error sending image to connection {}: {}", i, e);
-                to_remove.push(i);
+        if let Some(ws) = &mut connection.connection {
+            if let Err(e) = ws.send(Message::binary(img.to_vec())).await {
+                eprintln!("Error sending image to connection: {}", e);
             }
         }
 
-        while let Some(idx) = to_remove.pop() {
-            connections.connections.remove(idx);
-        }
 
         Ok(())
     }
 }
 
 #[derive(Default)]
-pub struct WebsocketConnections {
-    connections: Vec<WebSocketStream<TokioIo<Upgraded>>>,
+pub struct WebsocketConnection {
+    connection: Option<WebSocketStream<TokioIo<Upgraded>>>,
     take_pic: bool,
 }
 
-impl WebsocketConnections {
+impl WebsocketConnection {
     pub fn take_pic(&mut self) -> bool {
         if self.take_pic {
             self.take_pic = false;
@@ -89,11 +83,11 @@ impl Service<Request<body::Incoming>> for Session {
         if hyper_tungstenite::is_upgrade_request(&req) {
             let (response, websocket) = hyper_tungstenite::upgrade(&mut req, None).expect("WebSocket upgrade failed");
 
-            let conn = self.connections.clone();
+            let conn = self.connection.clone();
             tokio::spawn(async move {
                 match websocket.await {
                     Ok(ws) => {
-                        conn.lock().await.connections.push(ws);
+                        conn.lock().await.connection = Some(ws);
                     }
                     Err(e) => eprintln!("Failed to establish WebSocket connection: {}", e),
                 }
@@ -106,7 +100,7 @@ impl Service<Request<body::Incoming>> for Session {
                 .status(StatusCode::OK);
 
             let state = self.state.clone();
-            let connections = self.connections.clone();
+            let connection = self.connection.clone();
 
             let res = match req.method() {
                 &Method::GET => {
@@ -134,8 +128,8 @@ impl Service<Request<body::Incoming>> for Session {
                     match req.uri().path() {
                         "/pic" => {
                             tokio::spawn(async move {
-                                let connections = connections.clone();
-                                connections.lock().await.take_pic_time();
+                                let connection = connection.clone();
+                                connection.lock().await.take_pic_time();
                             });
                         },
                         "/export" => {

@@ -57,7 +57,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             let time = {
-                state_here.connections.lock().await.take_pic() 
+                state_here.connection.lock().await.take_pic() 
             };
             
             if time {
