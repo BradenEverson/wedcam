@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Image Stream</title>
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        #captureButton {
+            width: 160px;
+            height: 160px;
+            background-color: white;
+            color: black;
+            border: 2px solid black;
+            border-radius: 50%;
+            font-size: 60px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+        }
+
+        #closeButton {
+            width: 60px;
+            height: 60px;
+            background-color: white;
+            color: black;
+            border: 2px solid black;
+            border-radius: 50%;
+            font-size: 32px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+        }
+
+        #countdown {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 80px;
+            color: white;
+            text-shadow: 2px 2px 4px #000;
+            z-index: 10;
+        }
+
+        #flash {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: white;
+            z-index: 9;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.2s ease-in-out;
+        }
+
+        #popupForm {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 20px;
+            border: 2px solid black;
+            border-radius: 10px;
+            z-index: 11;
+        }
+
+        #popupForm input[type="email"] {
+            display: block;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        #popupForm button {
+            margin-right: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="imageCanvas"></canvas>
+    <button id="captureButton">📸</button>
+    <button id="closeButton">X</button>
+    <div id="countdown"></div>
+    <div id="flash"></div>
+    <div id="popupForm">
+        <p>Do you want to save your pictures via email?</p>
+        <input type="email" id="emailInput" placeholder="Enter your email" required>
+        <button id="submitEmail">Submit</button>
+        <button id="cancel">No Thanks!</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('imageCanvas');
+        const ctx = canvas.getContext('2d');
+        const captureButton = document.getElementById('captureButton');
+        const closeButton = document.getElementById('closeButton');
+        const countdownDiv = document.getElementById('countdown');
+        const flashDiv = document.getElementById('flash');
+        const popupForm = document.getElementById('popupForm');
+        const emailInput = document.getElementById('emailInput');
+        const submitEmail = document.getElementById('submitEmail');
+        const cancel = document.getElementById('cancel');
+        let countdownInterval;
+        let videoStream;
+        let ws;
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas(); // Initial canvas resize
+
+        // Get access to the webcam
+        async function setupWebcam() {
+            try {
+                videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const video = document.createElement('video');
+                video.srcObject = videoStream;
+                video.play();
+                video.onloadedmetadata = () => {
+                    video.width = canvas.width;
+                    video.height = canvas.height;
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                };
+                return video;
+            } catch (error) {
+                console.error('Error accessing webcam:', error);
+            }
+        }
+
+        setupWebcam().then((video) => {
+            // WebSocket setup
+            ws = new WebSocket('/'); // Replace with your WebSocket server address
+            ws.binaryType = 'arraybuffer';
+
+            ws.onopen = () => {
+                console.log('WebSocket connection established');
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+
+            ws.onclose = () => {
+                console.log('WebSocket connection closed');
+            };
+
+            captureButton.addEventListener('click', () => {
+                let countdown = 5;
+                countdownDiv.textContent = countdown;
+                countdownDiv.style.display = 'block';
+
+                countdownInterval = setInterval(() => {
+                    countdown -= 1;
+                    setTimeout(() => captureImage(video), 200); // Delay capture to sync with flash
+                    if (countdown === 0) {
+                        clearInterval(countdownInterval);
+                        countdownDiv.style.display = 'none';
+                        triggerFlash();
+                    } else {
+                        countdownDiv.textContent = countdown;
+                    }
+                }, 1000);
+            });
+        });
+
+        closeButton.addEventListener('click', () => {
+            popupForm.style.display = 'block';
+        });
+
+        submitEmail.addEventListener('click', () => {
+            const email = emailInput.value;
+            if (email) {
+                fetch(`/export?email=${encodeURIComponent(email)}`, {
+                    method: 'POST'
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log('Email sent successfully:', data);
+                        ws.close();
+                        window.location.href = '/';
+                    })
+                    .catch(error => {
+                        console.error('Error sending email:', error);
+                        ws.close();
+                        window.location.href = '/';
+                    });
+            }
+        });
+
+        cancel.addEventListener('click', () => {
+            ws.close();
+            window.location.href = '/';
+        });
+
+        function triggerFlash() {
+            flashDiv.style.display = 'block';
+            flashDiv.style.opacity = '1';
+            setTimeout(() => {
+                flashDiv.style.opacity = '0';
+                setTimeout(() => {
+                    flashDiv.style.display = 'none';
+                }, 200);
+            }, 100);
+        }
+
+        function captureImage(video) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            canvas.toBlob((blob) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    const arrayBuffer = reader.result;
+                    ws.send(arrayBuffer);
+                };
+                reader.readAsArrayBuffer(blob);
+            }, 'image/jpeg');
+        }
+    </script>
+</body>
+
+</html>
